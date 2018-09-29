@@ -9,7 +9,7 @@
 namespace caffe2 {
 
   OPERATOR_SCHEMA(BilinearPooling)
-    .NumInputs(2, INT_MAX)
+    .NumInputs(2)
     .NumOutputs(1)
     .SetDoc(R"DOC(
         Applies Outer product at each spatial cell of two inputs and pools results.
@@ -21,7 +21,8 @@ namespace caffe2 {
     .Input(0, "fa", "Feature extractor A.")
     .Input(1, "fb", "Feature extractor B.")
     .Output(0, "out", "Gathered features of blobs")
-    .Output(1, "outer", "Unpooled outer-product needed for gradient");
+    //.Output(1, "outer", "Unpooled outer-product needed for gradient");
+    ;
 
     REGISTER_CPU_OPERATOR(BilinearPooling, BilinearPoolingOp);
     //REGISTER_CPU_OPERATOR(BilinearPooling, BilinearPoolingOp<CPUContext>);

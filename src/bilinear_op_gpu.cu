@@ -3,7 +3,6 @@
 #include "bilinear_op.h"
 
 
-/*
 __global__ void RunTwoStageOp(
         const float* fa, const float* fb,
         const int N, const int C, const int HW,
@@ -12,23 +11,29 @@ __global__ void RunTwoStageOp(
     // TODO logarthimic parallel reduction.
 
     //const int idx = threadIdx.x + blockIdx.x*blockDim.x;
-    CUDA_1D_KERNEL_LOOP(idx, N*C*C) {
+    CUDA_1D_KERNEL_LOOP(idx, N*HW*C*C) {
 
-        const int n  = idx / (HW);
+        const int n  = idx / (HW) / C / C;
+        const int c1  = (idx / (HW) / C) % C;
+        const int c2  = (idx / (HW))  % C;
         const int hw = idx % HW;
 
-        for (int sa=0; sa<HW; sa++) {
-            for (int sb=0; sb<HW; sb++) {
-                out[((n*C+sa)*C+sb)*HW + hw] += fa[n*C*HW + hw + sa*HW] *
-                                                fb[n*C*HW + hw + sb*HW];
+        float d = fa[ ((n*C)+c2) * HW + hw ] *
+                  fb[ ((n*C)+c1) * HW + hw ] /
+                  HW;
 
-                out[
-            }
-        }
+        // A normal accumulate-write DOES NOT work!
+        atomicAdd(out + (n*C*C + c2*C + c1), d);
 
+        // Doesn't work!
+        /*out[(n*C + c2)*C + c1] += fa[ ((n*C)+c2) * HW + hw ] *
+                                  fb[ ((n*C)+c1) * HW + hw ] /
+                                  HW;
+        */
+
+        // The fastest way is probably doing each C*C in a block and using shared mem
     }
 }
-*/
 
 // For each batch, for each spatial location, take of outer product channel-column-vector
 // Then pool each spatial location of same batch.
@@ -103,6 +108,7 @@ namespace caffe2 {
         public:
 
             bool RunOnDevice() override {
+                //std::cout << " -- Exec BP on GPU." << std::endl;
 
                 auto fa = Input(0), fb = Input(1);
 
@@ -112,6 +118,7 @@ namespace caffe2 {
                 const float* fa_data = fa.template data<float>();
                 const float* fb_data = fb.template data<float>();
 
+                /*
                 std::vector<int> outer_dims = {N,C,C,HW};
                 TensorCUDA* outer = Output(1); //(outer_dims, CUDA);
                 outer->Resize(outer_dims);
@@ -119,16 +126,18 @@ namespace caffe2 {
                 std::cout << outer_dims[0]*outer_dims[1]*outer_dims[2]*outer_dims[3] << std::endl;
                 std::cout << outer->size() << std::endl;
                 float* outer_data = outer->template mutable_data<float>();
+                */
 
                 // Final output
                 auto out = Output(0);
-                std::vector<TIndex> out_dims = {N,C,C};
+                std::vector<TIndex> out_dims = {N,C*C};
                 out->Resize(out_dims);
                 float* out_data = out->template mutable_data<float>();
 
-                int numThreads = N * HW;
+                cudaMemset(out_data, 0, sizeof(float)*out->size());
 
-                /*
+                int numThreads = N * HW * C * C;
+
                 RunTwoStageOp<<<
                     CAFFE_GET_BLOCKS(numThreads),
                     CAFFE_CUDA_NUM_THREADS,
@@ -136,11 +145,11 @@ namespace caffe2 {
                     gctx_.cuda_stream()>>>(
                             fa_data,
                             fb_data,
-                            N, C, H, W,
+                            N, C, HW,
                             out_data
                             );
-                */
 
+                /*
                 RunOuterProduct<<<
                     CAFFE_GET_BLOCKS(numThreads),
                     CAFFE_CUDA_NUM_THREADS,
@@ -163,6 +172,7 @@ namespace caffe2 {
                             N, C, HW,
                             out_data
                             );
+                */
 
                 return true;
             }

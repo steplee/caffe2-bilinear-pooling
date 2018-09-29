@@ -83,11 +83,11 @@ TEST_CASE("Works and stuff", "[basic]") {
     // Our operator.
     {
         // Better API from core/graph.h
-        auto op = AddOp(&predNet, "BilinearPooling", {"fa", "fb"}, {"pooled_out"});
+        auto op = AddOp(&predNet, "BilinearPooling", {"fa", "fb"}, {"pooled_out", "pooled_saved_outer"});
         op->set_allocated_device_option(allocate_DeviceOption());
 
         auto imgW = op->add_arg(), imgH = op->add_arg();
-        imgW->set_name("poolingScheme");
+        imgW->set_name("pooling_scheme");
         imgH->set_s("sum");
     }
 
@@ -106,7 +106,7 @@ TEST_CASE("Works and stuff", "[basic]") {
         //
         auto fa = wrk.GetBlob("fa")->GetMutableTensor(CUDA),
              fb = wrk.GetBlob("fb")->GetMutableTensor(CUDA),
-             outer = wrk.GetBlob("dbg_pooled_outer")->GetMutableTensor(CUDA); // pooled_outer is created only in TEST mode.
+             outer = wrk.GetBlob("pooled_saved_outer")->GetMutableTensor(CUDA);
         int N = fa->dims()[0], C = fa->dims()[1], H = fa->dims()[2], W = fa->dims()[3];
         int HW = H * W;
 
